@@ -68,7 +68,7 @@ class RouteModel(BaseModel):
     agency: AgencyModel | None = None
     name: NameModel
     desc: str | None = None
-    type: str | None = None
+    type: int | None = None
     url: str | None = None
     color: ColorModel | None = None
     sort_order: int | None = None
@@ -139,8 +139,24 @@ async def get_routes():
 
 @app.get("/routes/{id}", response_description="Obtener ruta por route_id", response_model=RouteModel)
 async def get_route_id(id: str):
-    ruta = await db["routes"].find_one({"route_id": id})
-    return ruta
+    ruta = await db["routes"].aggregate([
+        {
+            "$match": {
+                "route_id": id
+            }
+        },
+        {
+            "$lookup": {
+                "from": "agencies",
+                "localField": "agency",
+                "foreignField": "_id",
+                "as": "agency"
+            }
+        },
+        {
+            "$unwind": "$agency"
+        }]).to_list(1)
+    return ruta[0]
 
 @app.get("/stops", response_description="Obtener todas las paradas", response_model=List[StopModel])
 async def get_stops():
