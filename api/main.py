@@ -120,18 +120,48 @@ class StopModel(BaseModel):
     schema_extra = {
     }
 
+class AgencyRoutesModel(AgencyModel):
+  routes: List[RouteModel]
 
-@app.get("/agencies", response_description="Obtener todas las agencias", response_model=List[AgencyModel])
+  class Config:
+    arbitrary_types_allowed = True
+    json_encoders = {ObjectId: str}
+    schema_extra = {
+    }
+
+@app.get("/agencies", response_description="Obtener todas las agencias", response_model=List[AgencyModel], response_model_exclude_none=True)
 async def get_agencies():
   agencias = await db["agencies"].find().to_list(1000)
   return agencias
+
+@app.get("/agencies/routes", response_description="Obtener todas las agencias junto con las lineas de cada una", response_model=List[AgencyRoutesModel], response_model_exclude_none=True)
+async def get_agencies():
+  agencias = await db["agencies"].aggregate([
+      {
+        "$lookup": {
+          "from": "routes",
+          "localField": "_id",
+          "foreignField": "agency",
+          "as": "routes"
+        }
+      },
+      {
+        "$project": {
+          "_id": 0,
+          "routes": {
+            "_id": 0,
+            "agency": 0
+          }
+        }
+      }]).to_list(1000)
+  return agencias
     
-@app.get("/agencies/{id}", response_description="Obtener agencia por agency_id", response_model=AgencyModel)
+@app.get("/agencies/{id}", response_description="Obtener agencia por agency_id", response_model=AgencyModel, response_model_exclude_none=True)
 async def get_agency_id(id: str):
   agencia = await db["agencies"].find_one({"agency_id": id})
   return agencia
 
-@app.get("/routes", response_description="Obtener todas las rutas", response_model=List[RouteModel])
+@app.get("/routes", response_description="Obtener todas las rutas", response_model=List[RouteModel], response_model_exclude_none=True)
 async def get_routes():
   rutas = await db["routes"].aggregate([
     {
@@ -147,7 +177,7 @@ async def get_routes():
     }]).to_list(1000)
   return rutas
 
-@app.get("/routes/{id}", response_description="Obtener ruta por route_id", response_model=RouteModel)
+@app.get("/routes/{id}", response_description="Obtener ruta por route_id", response_model=RouteModel, response_model_exclude_none=True)
 async def get_route_id(id: str):
   ruta = await db["routes"].aggregate([
     {
@@ -168,12 +198,12 @@ async def get_route_id(id: str):
     }]).to_list(1)
   return ruta[0]
 
-@app.get("/stops", response_description="Obtener todas las paradas", response_model=List[StopModel])
+@app.get("/stops", response_description="Obtener todas las paradas", response_model=List[StopModel], response_model_exclude_none=True)
 async def get_stops():
   paradas = await db["stops"].find().to_list(1000)
   return paradas
 
-@app.get("/stops/{id}", response_description="Obtener parada por stop_id", response_model=StopModel)
+@app.get("/stops/{id}", response_description="Obtener parada por stop_id", response_model=StopModel, response_model_exclude_none=True)
 async def get_stop_id(id: str):
   parada = await db["stops"].find_one({"stop_id": id})
   return parada
