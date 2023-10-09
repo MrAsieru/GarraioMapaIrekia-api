@@ -10,10 +10,14 @@ from api.models.stop import StopModel
 
 
 app = FastAPI()
-# client = motor.motor_asyncio.AsyncIOMotorClient(f"mongodb://{os.environ['MONGODB_API_USER']}:{os.environ['MONGODB_API_USER_PASSWORD']}@mongodb:27017/{os.environ['MONGODB_INITDB_DATABASE']}")
-# db = client[os.environ['MONGODB_INITDB_DATABASE']]
-client = motor.motor_asyncio.AsyncIOMotorClient("mongodb://apiUser:apiUser@192.168.1.10:27017/it0")
-db = client["it0"]
+if not os.environ.get('MONGODB_API_USER') is None:
+  client = motor.motor_asyncio.AsyncIOMotorClient(f"mongodb://{os.environ['MONGODB_API_USER']}:{os.environ['MONGODB_API_USER_PASSWORD']}@mongodb:27017/{os.environ['MONGODB_INITDB_DATABASE']}")
+  db = client[os.environ['MONGODB_INITDB_DATABASE']]
+else:
+  #TODO: Quitar
+  client = motor.motor_asyncio.AsyncIOMotorClient("mongodb://apiUser:apiUser@192.168.1.10:27017/it0")
+  db = client["it0"]
+
 
 # CORS
 app.add_middleware(
