@@ -15,8 +15,8 @@ if not os.environ.get('MONGODB_API_USER') is None:
   db = client[os.environ['MONGODB_INITDB_DATABASE']]
 else:
   #TODO: Quitar
-  client = motor.motor_asyncio.AsyncIOMotorClient("mongodb://apiUser:apiUser@192.168.1.10:27017/it0")
-  db = client["it0"]
+  client = motor.motor_asyncio.AsyncIOMotorClient("mongodb://apiUser:apiUser@192.168.1.10:27017/gtfs")
+  db = client["gtfs"]
 
 
 # CORS
