@@ -9,6 +9,7 @@ import requests
 import asyncio
 
 from api.models.agencia import AgenciaModel, AgenciaLineasModel
+from api.models.feed import FeedModel
 from api.models.posicion import PosicionesModel, PosicionesRequestModel
 from api.models.linea import LineaModel
 from api.models.parada import ParadaModel
@@ -32,6 +33,12 @@ app.add_middleware(
   allow_methods=['*'],
   allow_headers=['*'],
 )
+
+# Feeds con tiempo real
+@app.get("/feeds/tiempoReal", response_description="Obtener feeds con tiempo real", response_model=List[FeedModel], response_model_exclude_none=True)
+async def get_feeds_tr():
+  feeds = await db["feeds"].find({"tiempoReal": {"$exists": True}}, projection={"idFeed": 1, "tiempoReal": 1}).to_list(1000)
+  return feeds
 
 
 @app.get("/agencias", response_description="Obtener todas las agencias", response_model=List[AgenciaModel], response_model_exclude_none=True)
@@ -224,6 +231,7 @@ async def actualizar_tiempo_real(idFeed: str):
 
   # Actualizar solamente feeds con suscriptores
   if len(lista_feeds[idFeed]["suscripciones"]) > 0:
+    actualizar = False
     # Recorrer todas las fuentes de tiempo real del feed
     for fuente_tr in lista_feeds[idFeed]["tiempoReal"]:
       new_data, modificado = await descargar_tiempo_real(fuente_tr)
@@ -232,8 +240,11 @@ async def actualizar_tiempo_real(idFeed: str):
       if new_data is not None:
         fuente_tr["data"] = new_data
         fuente_tr["modificado"] = modificado
-    for client in lista_feeds[idFeed]["suscripciones"]:
-      await enviar_datos(client, idFeed)
+        actualizar = True
+
+    if actualizar:
+      for client in lista_feeds[idFeed]["suscripciones"]:
+        await enviar_datos(client, idFeed)
 
 
 async def repeticion():
@@ -293,7 +304,7 @@ async def agregar_suscripciones(feeds_cliente: list[str], websocket: WebSocket):
 
     # Si el feed es nuevo, descargar datos
     if creado:
-      actualizar_tiempo_real(feed)
+      await actualizar_tiempo_real(feed)
     else:
       await enviar_datos(websocket, feed)
   print([f"{f} - {len(lista_feeds[f]['suscripciones'])} suscriptores\n" for f in lista_feeds.keys()])
@@ -305,7 +316,6 @@ async def eliminar_suscripciones(feeds_cliente: list[str], websocket: WebSocket)
     if feed in lista_feeds.keys():
       l = len(lista_feeds[feed]["suscripciones"])
       lista_feeds[feed]["suscripciones"].remove(websocket)
-      print(f"Websocket eliminado con exito: {len(lista_feeds[feed]['suscripciones']) == l-1}")
       if len(lista_feeds[feed]["suscripciones"]) == 0:
         del lista_feeds[feed]
   print([f"{f} - {len(lista_feeds[f]['suscripciones'])} suscriptores\n" for f in lista_feeds.keys()])
@@ -323,7 +333,7 @@ async def actualizar_suscripciones(feeds_actuales: list[str], feeds_nuevos: list
     await agregar_suscripciones(feeds_agregar, websocket)
 
 
-@app.websocket("/ws")
+@app.websocket("/tiempoReal")
 async def websocket_endpoint(websocket: WebSocket):
   await websocket.accept()
   print("Websocket accepted")
@@ -336,7 +346,7 @@ async def websocket_endpoint(websocket: WebSocket):
       await actualizar_suscripciones(feeds_cliente, feeds_cliente_nuevos, websocket)
       feeds_cliente = feeds_cliente_nuevos
   except WebSocketDisconnect:
-    eliminar_suscripciones(feeds_cliente, websocket)
+    await eliminar_suscripciones(feeds_cliente, websocket)
 
 
 asyncio.create_task(repeticion())
