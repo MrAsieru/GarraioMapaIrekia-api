@@ -1,3 +1,4 @@
 fastapi
 uvicorn==0.23.2
 motor==3.3.1
+requests
