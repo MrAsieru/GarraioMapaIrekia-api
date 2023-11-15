@@ -315,7 +315,10 @@ async def eliminar_suscripciones(feeds_cliente: list[str], websocket: WebSocket)
   for feed in feeds_cliente:
     if feed in lista_feeds.keys():
       l = len(lista_feeds[feed]["suscripciones"])
-      lista_feeds[feed]["suscripciones"].remove(websocket)
+      try:
+        lista_feeds[feed]["suscripciones"].remove(websocket)
+      except ValueError:
+        pass
       if len(lista_feeds[feed]["suscripciones"]) == 0:
         del lista_feeds[feed]
   print([f"{f} - {len(lista_feeds[f]['suscripciones'])} suscriptores\n" for f in lista_feeds.keys()])
