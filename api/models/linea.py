@@ -21,6 +21,7 @@ class LineaModel(BaseModel):
   idRed: str | None = None
   paradas: list[str] | None = None
   viajes: list[str] | None = None
+  bbox: list[float]
 
   class Config:
     arbitrary_types_allowed = True

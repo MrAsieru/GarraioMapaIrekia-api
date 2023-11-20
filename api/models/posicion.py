@@ -7,6 +7,7 @@ class PosicionesRequestModel(BaseModel):
 
 class PosicionViajeModel(BaseModel):
   idViaje: str
+  idLinea: str
   posiciones: str
 
 class PosicionAgenciaModel(BaseModel):

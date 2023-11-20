@@ -112,7 +112,18 @@ async def get_routes():
   return rutas
 
 @app.get("/lineas/{id}", response_description="Obtener ruta por idLinea", response_model=LineaModel, response_model_exclude_none=True)
-async def get_route_id(id: str):
+async def get_route_id(id: str, incluirParadas: bool = False):
+  projeccion = {
+    "_id": 0,
+    "agencia": {
+      "_id": 0,
+      "lineas": 0
+    },
+    "viajes": 0
+  }
+  if not incluirParadas:
+    projeccion["paradas"] = 0
+
   ruta = await db["lineas"].aggregate([
     {
       "$match": {
@@ -131,15 +142,7 @@ async def get_route_id(id: str):
       "$unwind": "$agencia"
     },
     {
-      "$project": {
-        "_id": 0,
-        "agencia": {
-          "_id": 0,
-          "lineas": 0
-        },
-        "viajes": 0,
-        "paradas": 0
-      }
+      "$project": projeccion
     }]).to_list(1)
   return ruta[0]
 
@@ -162,6 +165,39 @@ async def get_stop_id(id: str):
   }
   parada = await db["paradas"].find_one({"_id": id}, projection=proyeccion)
   return parada
+
+@app.get("/paradas/{id}/lineas", response_description="Obtener lineas de idParada", response_model=List[LineaModel], response_model_exclude_none=True)
+async def get_stop_lines_colors(id: str):
+  lineas = await db["paradas"].aggregate([
+    {
+        '$match': {
+            '_id': id
+        }
+    }, {
+        '$lookup': {
+            'from': 'lineas', 
+            'localField': 'lineas', 
+            'foreignField': '_id', 
+            'as': 'lineas'
+        }
+    }, {
+        '$project': {
+            'lineas': 1
+        }
+    }, {
+        '$unwind': '$lineas'
+    }, {
+        '$replaceRoot': {
+            'newRoot': '$lineas'
+        }
+    }, {
+        '$project': {
+            'viajes': 0, 
+            'paradas': 0
+        }
+    }
+]).to_list(1000)
+  return lineas
 
 @app.post("/posicionesVehiculos", response_description="Obtener posiciones de los vehiculos para la fecha y agencias solicitadas", response_model=PosicionesModel, response_model_exclude_none=True)
 async def get_posicionesVehiculos(datos: PosicionesRequestModel):
