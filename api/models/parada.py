@@ -1,3 +1,4 @@
+import datetime
 from pydantic import BaseModel
 from bson import ObjectId
 
@@ -27,3 +28,41 @@ class ParadaModel(BaseModel):
   viajes: list[str] | None = None
   areas: list[str] | None = None
   nivel: NivelParadaModel | None = None
+  agencias: list[str]
+
+class FrecuenciasViajeModel(BaseModel):
+  horaInicio: str
+  horaFin: str
+  margen: int
+  exacto: bool | None = None
+
+class HorarioModel(BaseModel):
+  idParada: str
+  horaLlegada: str | None = None
+  horaSalida: str | None = None
+  orden: int
+  letrero: str | None = None
+  tipoRecogida: int | None = None
+  tipoBajada: int | None = None
+  recogidaContinua: bool | None = None
+  bajadaContinua: bool | None = None
+  distanciaRecorrida: int | None = None
+  exacto: bool | None = None
+
+class HorarioParadaModel(BaseModel):
+  idAgencia: str
+  idViaje: str
+  idLinea: str
+  idServicio: str
+  letrero: str | None = None
+  nombre: str | None = None
+  direccion: int | None = None
+  idBloque: str | None = None
+  idRecorrido: str | None = None
+  accesibilidad: int | None = None
+  bicicletas: int | None = None
+  horario: HorarioModel
+  paradas: list[str] | None = None
+  frecuencias: list[FrecuenciasViajeModel] | None = None
+  fechas: list[datetime.datetime] | None = None
+  zonaHoraria: str

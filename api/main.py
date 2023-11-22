@@ -1,10 +1,10 @@
-from datetime import datetime
+from datetime import datetime, time
 import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from typing import List
 import motor.motor_asyncio
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
+from datetime import datetime, timezone
 import requests
 import asyncio
 
@@ -12,7 +12,7 @@ from api.models.agencia import AgenciaModel, AgenciaLineasModel
 from api.models.feed import FeedModel
 from api.models.posicion import PosicionesModel, PosicionesRequestModel
 from api.models.linea import LineaModel
-from api.models.parada import ParadaModel
+from api.models.parada import HorarioParadaModel, ParadaModel
 
 
 app = FastAPI()
@@ -196,8 +196,101 @@ async def get_stop_lines_colors(id: str):
             'paradas': 0
         }
     }
-]).to_list(1000)
+  ]).to_list(1000)
   return lineas
+
+@app.get("/paradas/{id}/horarios", response_description="Obtener horarios de idParada", response_model=List[HorarioParadaModel], response_model_exclude_none=True)
+async def get_stop_schedules(id: str, fecha: datetime = datetime.utcnow()):
+  documentos = await db["paradas"].aggregate([
+    {
+        '$match': {
+            '_id': id
+        }
+    }, {
+        '$lookup': {
+            'from': 'viajes', 
+            'localField': 'viajes', 
+            'foreignField': '_id', 
+            'as': 'viajes'
+        }
+    }, {
+        '$unwind': {
+            'path': '$viajes'
+        }
+    }, {
+        '$lookup': {
+            'from': 'agencias', 
+            'localField': 'viajes.idAgencia', 
+            'foreignField': '_id', 
+            'as': 'viajes.agencia'
+        }
+    }, {
+        '$replaceRoot': {
+            'newRoot': '$viajes'
+        }
+    }, {
+        '$unwind': {
+            'path': '$agencia', 
+            'preserveNullAndEmptyArrays': False
+        }
+    }, {
+        '$addFields': {
+            'hora': {
+                '$dateToString': {
+                    'date': fecha, 
+                    'format': '%H:%M:%S', 
+                    'timezone': '$agencia.zonaHoraria'
+                }
+            },
+            'zonaHoraria': '$agencia.zonaHoraria'
+        }
+    }, {
+        '$match': {
+            'fechas': datetime.combine(datetime.now().date(), time.min)
+        }
+    }, {
+        '$addFields': {
+            'horario': {
+                '$filter': {
+                    'input': '$horarios', 
+                    'as': 'horario', 
+                    'cond': {
+                        '$and': [
+                            {
+                                '$eq': [
+                                    '$$horario.idParada', id
+                                ]
+                            }, {
+                                '$gt': [
+                                    '$$horario.horaSalida', '$hora'
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }, {
+        '$match': {
+            'horario': {
+                '$ne': []
+            }
+        }
+    }, {
+        '$unwind': {
+            'path': "$horario"
+        }
+    }, {
+        '$project': {
+            'agencia': 0,
+            'paradas': 0, 
+            'fechas': 0, 
+            'hora': 0, 
+            'horarios': 0
+        }
+    }
+  ]).to_list(1000)
+  return documentos
 
 @app.post("/posicionesVehiculos", response_description="Obtener posiciones de los vehiculos para la fecha y agencias solicitadas", response_model=PosicionesModel, response_model_exclude_none=True)
 async def get_posicionesVehiculos(datos: PosicionesRequestModel):
