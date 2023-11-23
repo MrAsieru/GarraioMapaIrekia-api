@@ -14,7 +14,7 @@ class HorariosViajeModel(BaseModel):
   tipoBajada: int | None = None
   recogidaContinua: bool | None = None
   bajadaContinua: bool | None = None
-  distanciaRecorrida: int | None = None
+  distanciaRecorrida: float | None = None
   exacto: bool | None = None
 
 class FrecuenciasViajeModel(BaseModel):

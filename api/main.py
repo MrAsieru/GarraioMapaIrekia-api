@@ -4,7 +4,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from typing import List
 import motor.motor_asyncio
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import requests
 import asyncio
 
@@ -233,94 +233,180 @@ async def get_stop_lines_colors(id: str):
   return lineas
 
 @app.get("/paradas/{id}/horarios", response_description="Obtener horarios de idParada", response_model=List[HorarioParadaModel], response_model_exclude_none=True)
-async def get_stop_schedules(id: str, fecha: datetime = datetime.utcnow()):
+async def get_stop_schedules(id: str, fecha: datetime = datetime.utcnow(), hasta: datetime = (datetime.utcnow() + timedelta(hours=2))):
   documentos = await db["paradas"].aggregate([
     {
-        '$match': {
+      '$match': {
+        '$or': [
+          {
             '_id': id
-        }
-    }, {
-        '$lookup': {
-            'from': 'viajes', 
-            'localField': 'viajes', 
-            'foreignField': '_id', 
-            'as': 'viajes'
-        }
-    }, {
-        '$unwind': {
-            'path': '$viajes'
-        }
-    }, {
-        '$lookup': {
-            'from': 'agencias', 
-            'localField': 'viajes.idAgencia', 
-            'foreignField': '_id', 
-            'as': 'viajes.agencia'
-        }
-    }, {
-        '$replaceRoot': {
-            'newRoot': '$viajes'
-        }
-    }, {
-        '$unwind': {
-            'path': '$agencia', 
-            'preserveNullAndEmptyArrays': False
-        }
-    }, {
-        '$addFields': {
-            'hora': {
-                '$dateToString': {
-                    'date': fecha, 
-                    'format': '%H:%M:%S', 
-                    'timezone': '$agencia.zonaHoraria'
-                }
-            },
-            'zonaHoraria': '$agencia.zonaHoraria'
-        }
-    }, {
-        '$match': {
-            'fechas': datetime.combine(datetime.now().date(), time.min)
-        }
-    }, {
-        '$addFields': {
-            'horario': {
-                '$filter': {
-                    'input': '$horarios', 
-                    'as': 'horario', 
-                    'cond': {
-                        '$and': [
-                            {
-                                '$eq': [
-                                    '$$horario.idParada', id
-                                ]
-                            }, {
-                                '$gt': [
-                                    '$$horario.horaSalida', '$hora'
-                                ]
-                            }
-                        ]
+          },
+          {
+            'paradaPadre': id
+          }
+        ]
+      }
+    },
+    {
+      '$lookup': {
+        'from': 'viajes', 
+        'localField': 'viajes', 
+        'foreignField': '_id', 
+        'as': 'viajes'
+      }
+    },
+    {
+      '$unwind': {
+        'path': '$viajes'
+      }
+    },
+    {
+      '$lookup': {
+        'from': 'agencias', 
+        'localField': 'viajes.idAgencia', 
+        'foreignField': '_id', 
+        'as': 'viajes.agencia'
+      }
+    },
+    {
+      '$addFields': {
+        'viajes.idParada': '$_id'
+      }
+    },
+    {
+      '$replaceRoot': {
+        'newRoot': '$viajes'
+      }
+    },
+    {
+      '$unwind': {
+        'path': '$agencia', 
+        'preserveNullAndEmptyArrays': False
+      }
+    },
+    {
+      '$addFields': {
+        'zonaHoraria': '$agencia.zonaHoraria'
+      }
+    },
+    {
+      '$match': {
+        'fechas': datetime.combine(datetime.now().date(), time.min)
+      }
+    },
+    {
+      '$addFields': {
+        'horario': {
+          '$filter': {
+            'input': '$horarios', 
+            'as': 'horario', 
+            'cond': {
+              '$and': [
+                {
+                  '$eq': [
+                    '$$horario.idParada', "$idParada"
+                  ]
+                },
+                {
+                  '$gte': [
+                    '$$horario.horaSalida', 
+                    {
+                      '$dateToString': {
+                        'date': fecha, 
+                        'format': '%H:%M:%S', 
+                        'timezone': '$zonaHoraria'
+                      }
                     }
+                  ]
+                },
+                {
+                  '$lte': [
+                    "$$horario.horaSalida",
+                    {
+                      '$dateToString': {
+                        'date': hasta, 
+                        'format': '%H:%M:%S', 
+                        'timezone': '$zonaHoraria'
+                      }
+                    }
+                  ]
                 }
+              ]
             }
+          }
         }
-    }, {
-        '$match': {
-            'horario': {
-                '$ne': []
-            }
+      }
+    },
+    {
+      '$match': {
+        'horario': {
+          '$ne': []
         }
-    }, {
-        '$unwind': {
-            'path': "$horario"
+      }
+    },
+    {
+      '$unwind': {
+        'path': "$horario"
+      }
+    },
+    {
+      '$project': {
+        'agencia': 0,
+        'paradas': 0, 
+        'fechas': 0,
+        'horarios': 0
+      }
+    }
+  ]).to_list(1000)
+  return documentos
+
+@app.get("/paradas/{id}/agencias", response_description="Obtener agencias de idParada", response_model=List[AgenciaModel], response_model_exclude_none=True)
+async def get_stop_agencies(id: str):
+  documentos = await db["paradas"].aggregate([
+    {
+      '$match': {
+        '$or': [
+          {
+            '_id': id
+          },
+          {
+            'paradaPadre': id
+          }
+        ], 
+        'agencias': {
+          '$exists': True
         }
-    }, {
-        '$project': {
-            'agencia': 0,
-            'paradas': 0, 
-            'fechas': 0, 
-            'hora': 0, 
-            'horarios': 0
-        }
+      }
+    },
+    {
+      '$unwind': '$agencias'
+    },
+    {
+      '$group': {
+        '_id': '$agencias'
+      }
+    },
+    {
+      '$lookup': {
+        'from': 'agencias', 
+        'localField': '_id', 
+        'foreignField': '_id', 
+        'as': 'agencia'
+      }
+    },
+    {
+      '$unwind': '$agencia'
+    },
+    {
+      '$replaceRoot': {
+        'newRoot': '$agencia'
+      }
+    },
+    {
+      '$project': {
+        '_id': 0, 
+        'lineas': 0
+      }
     }
   ]).to_list(1000)
   return documentos

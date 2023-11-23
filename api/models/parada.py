@@ -28,7 +28,7 @@ class ParadaModel(BaseModel):
   viajes: list[str] | None = None
   areas: list[str] | None = None
   nivel: NivelParadaModel | None = None
-  agencias: list[str]
+  agencias: list[str] | None = None
 
 class FrecuenciasViajeModel(BaseModel):
   horaInicio: str
@@ -46,7 +46,7 @@ class HorarioModel(BaseModel):
   tipoBajada: int | None = None
   recogidaContinua: bool | None = None
   bajadaContinua: bool | None = None
-  distanciaRecorrida: int | None = None
+  distanciaRecorrida: float | None = None
   exacto: bool | None = None
 
 class HorarioParadaModel(BaseModel):
