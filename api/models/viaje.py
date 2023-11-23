@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from api.models.parada import ParadaModel
 
 
-class HorariosViajeModel(BaseModel):
+class HorarioViajeModel(BaseModel):
   idParada: str
   horaLlegada: str | None = None
   horaSalida: str | None = None
@@ -23,7 +23,7 @@ class FrecuenciasViajeModel(BaseModel):
   margen: int
   exacto: bool | None = None
 
-class HorarioModel(BaseModel):
+class ViajeModel(BaseModel):
   idAgencia: str
   idViaje: str
   idLinea: str
@@ -35,7 +35,7 @@ class HorarioModel(BaseModel):
   idRecorrido: str | None = None
   accesibilidad: int | None = None
   bicicletas: int | None = None
-  horarios: list[HorariosViajeModel] | None = None
+  horarios: list[HorarioViajeModel] | None = None
   paradas: list[str] | None = None
   frecuencias: list[FrecuenciasViajeModel] | None = None
   fechas: list[datetime.datetime] | None = None

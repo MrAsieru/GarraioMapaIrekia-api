@@ -12,7 +12,7 @@ from api.models.agencia import AgenciaModel, AgenciaLineasModel
 from api.models.feed import FeedModel
 from api.models.posicion import PosicionesModel, PosicionesRequestModel
 from api.models.linea import LineaModel
-from api.models.parada import HorarioParadaModel, ParadaModel
+from api.models.parada import ViajeParadaModel, ParadaModel
 
 
 app = FastAPI()
@@ -232,7 +232,7 @@ async def get_stop_lines_colors(id: str):
   ]).to_list(1000)
   return lineas
 
-@app.get("/paradas/{id}/horarios", response_description="Obtener horarios de idParada", response_model=List[HorarioParadaModel], response_model_exclude_none=True)
+@app.get("/paradas/{id}/horarios", response_description="Obtener horarios de idParada", response_model=List[ViajeParadaModel], response_model_exclude_none=True)
 async def get_stop_schedules(id: str, fecha: datetime = datetime.utcnow(), hasta: datetime = (datetime.utcnow() + timedelta(hours=2))):
   documentos = await db["paradas"].aggregate([
     {
