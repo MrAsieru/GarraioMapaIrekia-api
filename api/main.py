@@ -84,6 +84,39 @@ async def get_agency_id(id: str):
   agencia = await db["agencias"].find_one({"_id": id}, projection=proyeccion)
   return agencia
 
+@app.get("/agencias/{id}/lineas", response_description="Obtener lineas de idAgencia", response_model=List[LineaModel], response_model_exclude_none=True)
+async def get_agency_lines(id: str):
+  lineas = await db["agencias"].aggregate([
+    {
+      "$match": {
+        "_id": id
+      }
+    },
+    {
+      "$lookup": {
+        "from": "lineas",
+        "localField": "lineas",
+        "foreignField": "_id",
+        "as": "lineas"
+      }
+    },
+    {
+      "$unwind": "$lineas"
+    },
+    {
+      "$replaceRoot": {
+        "newRoot": "$lineas"
+      }
+    },
+    {
+      "$project": {
+        "_id": 0,
+        "viajes": 0,
+        "paradas": 0
+      }
+    }]).to_list(1000)
+  return lineas
+
 @app.get("/lineas", response_description="Obtener todas las rutas", response_model=List[LineaModel], response_model_exclude_none=True)
 async def get_routes():
   rutas = await db["lineas"].aggregate([
@@ -113,7 +146,7 @@ async def get_routes():
 
 @app.get("/lineas/{id}", response_description="Obtener ruta por idLinea", response_model=LineaModel, response_model_exclude_none=True)
 async def get_route_id(id: str, incluirParadas: bool = False):
-  projeccion = {
+  proyeccion = {
     "_id": 0,
     "agencia": {
       "_id": 0,
@@ -122,7 +155,7 @@ async def get_route_id(id: str, incluirParadas: bool = False):
     "viajes": 0
   }
   if not incluirParadas:
-    projeccion["paradas"] = 0
+    proyeccion["paradas"] = 0
 
   ruta = await db["lineas"].aggregate([
     {
@@ -142,7 +175,7 @@ async def get_route_id(id: str, incluirParadas: bool = False):
       "$unwind": "$agencia"
     },
     {
-      "$project": projeccion
+      "$project": proyeccion
     }]).to_list(1)
   return ruta[0]
 

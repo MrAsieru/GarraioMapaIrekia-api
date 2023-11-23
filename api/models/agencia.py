@@ -11,6 +11,7 @@ class AgenciaModel(BaseModel):
   urlTarifa: str | None = None
   email: str | None = None
   lineas: list[str] | None = None
+  bbox: list[float]
 
 from api.models.linea import LineaModel
 
