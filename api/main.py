@@ -341,24 +341,122 @@ async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta
       },
       {
         '$addFields': {
-          'zonaHoraria': '$agencia.zonaHoraria'
+          'zonaHoraria': '$agencia.zonaHoraria',
+          'desdeFechaLocal': {
+            '$dateFromParts': {
+              'year': {
+                '$year': {
+                  'date': fDesde, 
+                  'timezone': '$agencia.zonaHoraria'
+                }
+              }, 
+              'month': {
+                '$month': {
+                  'date': fDesde, 
+                  'timezone': '$agencia.zonaHoraria'
+                }
+              }, 
+              'day': {
+                '$dayOfMonth': {
+                  'date': fDesde, 
+                  'timezone': '$agencia.zonaHoraria'
+                }
+              }
+            }
+          },
+          'hastaFechaLocal': {
+            '$dateFromParts': {
+              'year': {
+                '$year': {
+                  'date': fHasta, 
+                  'timezone': '$agencia.zonaHoraria'
+                }
+              }, 
+              'month': {
+                '$month': {
+                  'date': fHasta, 
+                  'timezone': '$agencia.zonaHoraria'
+                }
+              }, 
+              'day': {
+                '$dayOfMonth': {
+                  'date': fHasta, 
+                  'timezone': '$agencia.zonaHoraria'
+                }
+              }
+            }
+          },
+          'desdeHoraLocal': {
+            '$dateToString': {
+              'date': fDesde, 
+              'format': '%H:%M:%S', 
+              'timezone': '$agencia.zonaHoraria'
+            }
+          },
+          'hastaHoraLocal': {
+            '$dateToString': {
+              'date': fHasta, 
+              'format': '%H:%M:%S', 
+              'timezone': '$agencia.zonaHoraria'
+            }
+          }
         }
       },
       {
         '$match': {
           '$expr': {
-            '$in': [
+            '$or': [
               {
-                '$dateFromParts': {
-                  'year': { '$year': { 'date': fDesde, 'timezone': "$zonaHoraria" } },
-                  'month': { '$month': { 'date': fDesde, 'timezone': "$zonaHoraria" } },
-                  'day': { '$dayOfMonth': { 'date': fDesde, 'timezone': "$zonaHoraria" } },
-                  'hour': 0,
-                  'minute': 0,
-                  'second': 0
-                }
-              },
-              '$fechas'
+                '$in': [
+                  {
+                    '$dateFromParts': {
+                      'year': {
+                        '$year': {
+                          'date': fDesde, 
+                          'timezone': '$zonaHoraria'
+                        }
+                      }, 
+                      'month': {
+                        '$month': {
+                          'date': fDesde, 
+                          'timezone': '$zonaHoraria'
+                        }
+                      }, 
+                      'day': {
+                        '$dayOfMonth': {
+                          'date': fDesde, 
+                          'timezone': '$zonaHoraria'
+                        }
+                      }
+                    }
+                  }, '$fechas'
+                ]
+              }, {
+                '$in': [
+                  {
+                    '$dateFromParts': {
+                      'year': {
+                        '$year': {
+                          'date': fHasta, 
+                          'timezone': '$zonaHoraria'
+                        }
+                      }, 
+                      'month': {
+                        '$month': {
+                          'date': fHasta, 
+                          'timezone': '$zonaHoraria'
+                        }
+                      }, 
+                      'day': {
+                        '$dayOfMonth': {
+                          'date': fHasta, 
+                          'timezone': '$zonaHoraria'
+                        }
+                      }
+                    }
+                  }, '$fechas'
+                ]
+              }
             ]
           }
         }
@@ -377,29 +475,72 @@ async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta
                     ]
                   },
                   {
-                    "$gte": [
-                      { '$ifNull': [ "$$horario.horaSalida", "$$horario.horaLlegada" ] },
-                      {
-                        "$dateToString": {
-                          "date": fDesde,
-                          "format": "%H:%M:%S",
-                          "timezone": "$zonaHoraria"
+                    '$cond': {
+                        'if': {
+                            '$in': [
+                                '$desdeFechaLocal', '$fechas'
+                            ]
+                        }, 
+                        'then': {
+                            '$cond': {
+                                'if': {
+                                    '$in': [
+                                        '$hastaFechaLocal', '$fechas'
+                                    ]
+                                }, 
+                                'then': {
+                                    '$cond': {
+                                        'if': {
+                                            '$lt': [
+                                                '$desdeHoraLocal', '$$horario.horaLlegada'
+                                            ]
+                                        }, 
+                                        'then': {
+                                            '$cond': {
+                                                'if': {
+                                                    '$lt': [
+                                                        '$$horario.horaLlegada', '$hastaHoraLocal'
+                                                    ]
+                                                }, 
+                                                'then': 1, 
+                                                'else': {
+                                                    '$lt': [
+                                                        '$hastaHoraLocal', '$desdeHoraLocal'
+                                                    ]
+                                                }
+                                            }
+                                        }, 
+                                        'else': {
+                                            '$lt': [
+                                                '$$horario.horaLlegada', '$hastaHoraLocal'
+                                            ]
+                                        }
+                                    }
+                                }, 
+                                'else': {
+                                    '$lt': [
+                                        '$desdeHoraLocal', '$$horario.horaLlegada'
+                                    ]
+                                }
+                            }
+                        }, 
+                        'else': {
+                            '$cond': {
+                                'if': {
+                                    '$in': [
+                                        '$hastaFechaLocal', '$fechas'
+                                    ]
+                                }, 
+                                'then': {
+                                    '$lt': [
+                                        '$$horario.horaLlegada', '$hastaHoraLocal'
+                                    ]
+                                }, 
+                                'else': False
+                            }
                         }
-                      }
-                    ]
-                  },
-                  {
-                    '$lte': [
-                      { '$ifNull': [ "$$horario.horaSalida", "$$horario.horaLlegada" ] },
-                      {
-                        '$dateToString': {
-                          'date': fHasta, 
-                          'format': '%H:%M:%S', 
-                          'timezone': '$zonaHoraria'
-                        }
-                      }
-                    ]
-                  }
+                    }
+                }
                 ]
               }
             }

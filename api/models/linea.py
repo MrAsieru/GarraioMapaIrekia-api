@@ -4,6 +4,14 @@ from bson import ObjectId
 from api.models.agencia import AgenciaModel
 
 
+class PatronLineaModel(BaseModel):
+  de: str
+  a: str
+  idDireccion: str | None = None
+  letrero: str | None = None
+  viajes: list[str] | None = None
+  paradas: list[str]
+
 class LineaModel(BaseModel):
   idLinea: str
   idAgencia: str
@@ -22,9 +30,8 @@ class LineaModel(BaseModel):
   paradas: list[str] | None = None
   viajes: list[str] | None = None
   bbox: list[float]
+  patrones: list[PatronLineaModel] | None = None
 
-  class Config:
-    arbitrary_types_allowed = True
-    json_encoders = {ObjectId: str}
-    schema_extra = {
-    }
+
+class RespuestaPatronLineaModel(PatronLineaModel):
+  numViajes: int
