@@ -492,14 +492,14 @@ async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta
                                     '$cond': {
                                         'if': {
                                             '$lt': [
-                                                '$desdeHoraLocal', '$$horario.horaLlegada'
+                                                '$desdeHoraLocal', { '$ifNull': [ "$$horario.horaSalida", "$$horario.horaLlegada" ] }
                                             ]
                                         }, 
                                         'then': {
                                             '$cond': {
                                                 'if': {
                                                     '$lt': [
-                                                        '$$horario.horaLlegada', '$hastaHoraLocal'
+                                                        { '$ifNull': [ "$$horario.horaSalida", "$$horario.horaLlegada" ] }, '$hastaHoraLocal'
                                                     ]
                                                 }, 
                                                 'then': 1, 
@@ -512,14 +512,14 @@ async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta
                                         }, 
                                         'else': {
                                             '$lt': [
-                                                '$$horario.horaLlegada', '$hastaHoraLocal'
+                                                { '$ifNull': [ "$$horario.horaSalida", "$$horario.horaLlegada" ] }, '$hastaHoraLocal'
                                             ]
                                         }
                                     }
                                 }, 
                                 'else': {
                                     '$lt': [
-                                        '$desdeHoraLocal', '$$horario.horaLlegada'
+                                        '$desdeHoraLocal', { '$ifNull': [ "$$horario.horaSalida", "$$horario.horaLlegada" ] }
                                     ]
                                 }
                             }
@@ -533,7 +533,7 @@ async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta
                                 }, 
                                 'then': {
                                     '$lt': [
-                                        '$$horario.horaLlegada', '$hastaHoraLocal'
+                                        { '$ifNull': [ "$$horario.horaSalida", "$$horario.horaLlegada" ] }, '$hastaHoraLocal'
                                     ]
                                 }, 
                                 'else': False
