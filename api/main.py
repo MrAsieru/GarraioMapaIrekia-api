@@ -5,13 +5,14 @@ from typing import List
 import motor.motor_asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone, timedelta
+import pytz
 import requests
 import asyncio
 
 from api.models.agencia import AgenciaModel, AgenciaLineasModel
 from api.models.feed import FeedModel
 from api.models.posicion import PosicionesModel, PosicionesRequestModel
-from api.models.linea import LineaModel
+from api.models.linea import LineaModel, RespuestaPatronLineaModel
 from api.models.parada import ViajeParadaModel, ParadaModel
 
 
@@ -145,19 +146,22 @@ async def get_routes():
   return rutas
 
 @app.get("/lineas/{id}", response_description="Obtener ruta por idLinea", response_model=LineaModel, response_model_exclude_none=True)
-async def get_route_id(id: str, incluirParadas: bool = False):
-  proyeccion = {
-    "_id": 0,
-    "agencia": {
-      "_id": 0,
-      "lineas": 0
+async def get_route_id(id: str):
+  ruta = await db["lineas"].find_one(
+    {
+      "_id": id
     },
-    "viajes": 0
-  }
-  if not incluirParadas:
-    proyeccion["paradas"] = 0
+    {
+      "_id": 0,
+      "viajes": 0,
+      "paradas": 0,
+      "patrones": 0
+    })
+  return ruta
 
-  ruta = await db["lineas"].aggregate([
+@app.get("/lineas/{id}/paradas", response_description="Obtener paradas de idLinea", response_model=List[ParadaModel], response_model_exclude_none=True)
+async def get_route_stops(id: str):
+  paradas = await db["lineas"].aggregate([
     {
       "$match": {
         "_id": id
@@ -165,19 +169,61 @@ async def get_route_id(id: str, incluirParadas: bool = False):
     },
     {
       "$lookup": {
-        "from": "agencias",
-        "localField": "idAgencia",
+        "from": "paradas",
+        "localField": "paradas",
         "foreignField": "_id",
-        "as": "agencia"
+        "as": "paradas"
       }
     },
     {
-      "$unwind": "$agencia"
+      "$unwind": "$paradas"
     },
     {
-      "$project": proyeccion
-    }]).to_list(1)
-  return ruta[0]
+      "$replaceRoot": {
+        "newRoot": "$paradas"
+      }
+    },
+    {
+      "$project": {
+        "_id": 0,
+        "lineas": 0,
+        "viajes": 0
+      }
+    }]).to_list(1000)
+  return paradas
+
+@app.get("/lineas/{id}/patrones", response_description="Obtener patrones de idLinea", response_model=List[RespuestaPatronLineaModel], response_model_exclude_none=True)
+async def get_route_patterns(id: str):
+  patrones = await db["lineas"].aggregate([
+    {
+      '$match': {
+        '_id': 'Bizkaibus_651'
+      }
+    },
+    {
+      '$unwind': {
+        'path': '$patrones'
+      }
+    },
+    {
+      '$replaceRoot': {
+        'newRoot': '$patrones'
+      }
+    },
+    {
+      '$addFields': {
+        'numViajes': {
+          '$size': '$viajes'
+        }
+      }
+    },
+    {
+      '$project': {
+        'viajes': 0
+      }
+    }
+  ]).to_list(1000)
+  return patrones
 
 @app.get("/paradas", response_description="Obtener todas las paradas", response_model=List[ParadaModel], response_model_exclude_none=True)
 async def get_stops():
@@ -233,131 +279,162 @@ async def get_stop_lines_colors(id: str):
   return lineas
 
 @app.get("/paradas/{id}/horarios", response_description="Obtener horarios de idParada", response_model=List[ViajeParadaModel], response_model_exclude_none=True)
-async def get_stop_schedules(id: str, fecha: datetime = datetime.utcnow(), hasta: datetime = (datetime.utcnow() + timedelta(hours=2))):
-  documentos = await db["paradas"].aggregate([
-    {
-      '$match': {
-        '$or': [
-          {
-            '_id': id
-          },
-          {
-            'paradaPadre': id
-          }
-        ]
-      }
-    },
-    {
-      '$lookup': {
-        'from': 'viajes', 
-        'localField': 'viajes', 
-        'foreignField': '_id', 
-        'as': 'viajes'
-      }
-    },
-    {
-      '$unwind': {
-        'path': '$viajes'
-      }
-    },
-    {
-      '$lookup': {
-        'from': 'agencias', 
-        'localField': 'viajes.idAgencia', 
-        'foreignField': '_id', 
-        'as': 'viajes.agencia'
-      }
-    },
-    {
-      '$addFields': {
-        'viajes.idParada': '$_id'
-      }
-    },
-    {
-      '$replaceRoot': {
-        'newRoot': '$viajes'
-      }
-    },
-    {
-      '$unwind': {
-        'path': '$agencia', 
-        'preserveNullAndEmptyArrays': False
-      }
-    },
-    {
-      '$addFields': {
-        'zonaHoraria': '$agencia.zonaHoraria'
-      }
-    },
-    {
-      '$match': {
-        'fechas': datetime.combine(datetime.now().date(), time.min)
-      }
-    },
-    {
-      '$addFields': {
-        'horario': {
-          '$filter': {
-            'input': '$horarios', 
-            'as': 'horario', 
-            'cond': {
-              '$and': [
-                {
-                  '$eq': [
-                    '$$horario.idParada', "$idParada"
-                  ]
-                },
-                {
-                  '$gte': [
-                    '$$horario.horaSalida', 
-                    {
-                      '$dateToString': {
-                        'date': fecha, 
-                        'format': '%H:%M:%S', 
-                        'timezone': '$zonaHoraria'
-                      }
-                    }
-                  ]
-                },
-                {
-                  '$lte': [
-                    "$$horario.horaSalida",
-                    {
-                      '$dateToString': {
-                        'date': hasta, 
-                        'format': '%H:%M:%S', 
-                        'timezone': '$zonaHoraria'
-                      }
-                    }
-                  ]
+async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta: datetime = None):
+  # Change desde to UTC
+  desde = desde.astimezone(pytz.utc)
+  if hasta is None:
+    hasta = desde + timedelta(hours=2)
+  hasta = hasta.astimezone(pytz.utc)
+  print(f"Fecha: {desde}, hasta: {hasta}")
+  print(f"{desde.replace(hour=23, minute=59, second=59)}, {hasta.replace(hour=0, minute=0, second=0)}")
+
+  def aggregate_horarios(fDesde: datetime, fHasta: datetime):
+    return [
+      {
+        '$match': {
+          '$or': [
+            {
+              '_id': id
+            },
+            {
+              'paradaPadre': id
+            }
+          ]
+        }
+      },
+      {
+        '$lookup': {
+          'from': 'viajes', 
+          'localField': 'viajes', 
+          'foreignField': '_id', 
+          'as': 'viajes'
+        }
+      },
+      {
+        '$unwind': {
+          'path': '$viajes'
+        }
+      },
+      {
+        '$lookup': {
+          'from': 'agencias', 
+          'localField': 'viajes.idAgencia', 
+          'foreignField': '_id', 
+          'as': 'viajes.agencia'
+        }
+      },
+      {
+        '$addFields': {
+          'viajes.idParada': '$_id'
+        }
+      },
+      {
+        '$replaceRoot': {
+          'newRoot': '$viajes'
+        }
+      },
+      {
+        '$unwind': {
+          'path': '$agencia', 
+          'preserveNullAndEmptyArrays': False
+        }
+      },
+      {
+        '$addFields': {
+          'zonaHoraria': '$agencia.zonaHoraria'
+        }
+      },
+      {
+        '$match': {
+          '$expr': {
+            '$in': [
+              {
+                '$dateFromParts': {
+                  'year': { '$year': { 'date': fDesde, 'timezone': "$zonaHoraria" } },
+                  'month': { '$month': { 'date': fDesde, 'timezone': "$zonaHoraria" } },
+                  'day': { '$dayOfMonth': { 'date': fDesde, 'timezone': "$zonaHoraria" } },
+                  'hour': 0,
+                  'minute': 0,
+                  'second': 0
                 }
-              ]
+              },
+              '$fechas'
+            ]
+          }
+        }
+      },
+      {
+        '$addFields': {
+          'horario': {
+            '$filter': {
+              'input': '$horarios', 
+              'as': 'horario', 
+              'cond': {
+                '$and': [
+                  {
+                    '$eq': [
+                      '$$horario.idParada', "$idParada"
+                    ]
+                  },
+                  {
+                    "$gte": [
+                      { '$ifNull': [ "$$horario.horaSalida", "$$horario.horaLlegada" ] },
+                      {
+                        "$dateToString": {
+                          "date": fDesde,
+                          "format": "%H:%M:%S",
+                          "timezone": "$zonaHoraria"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    '$lte': [
+                      { '$ifNull': [ "$$horario.horaSalida", "$$horario.horaLlegada" ] },
+                      {
+                        '$dateToString': {
+                          'date': fHasta, 
+                          'format': '%H:%M:%S', 
+                          'timezone': '$zonaHoraria'
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
             }
           }
         }
-      }
-    },
-    {
-      '$match': {
-        'horario': {
-          '$ne': []
+      },
+      {
+        '$match': {
+          'horario': {
+            '$ne': []
+          }
+        }
+      },
+      {
+        '$unwind': {
+          'path': "$horario"
+        }
+      },
+      {
+        '$project': {
+          'agencia': 0,
+          'paradas': 0, 
+          'fechas': 0,
+          'horarios': 0
         }
       }
-    },
-    {
-      '$unwind': {
-        'path': "$horario"
-      }
-    },
-    {
-      '$project': {
-        'agencia': 0,
-        'paradas': 0, 
-        'fechas': 0,
-        'horarios': 0
-      }
-    }
-  ]).to_list(1000)
+    ]
+
+  # Si fecha y hasta son distintos dias
+  if (desde.day != hasta.day):
+    documentos = await db["paradas"].aggregate(aggregate_horarios(desde, desde.replace(hour=23, minute=59, second=59))).to_list(1000)
+    documentos += await db["paradas"].aggregate(aggregate_horarios(hasta.replace(hour=0, minute=0, second=0), hasta)).to_list(1000)
+  else:
+    print(aggregate_horarios(desde, hasta))
+    documentos = await db["paradas"].aggregate(aggregate_horarios(desde, hasta)).to_list(1000)
   return documentos
 
 @app.get("/paradas/{id}/agencias", response_description="Obtener agencias de idParada", response_model=List[AgenciaModel], response_model_exclude_none=True)
