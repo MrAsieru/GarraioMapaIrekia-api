@@ -511,9 +511,19 @@ async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta
                                             }
                                         }, 
                                         'else': {
-                                            '$lt': [
-                                                { '$ifNull': [ "$$horario.horaSalida", "$$horario.horaLlegada" ] }, '$hastaHoraLocal'
-                                            ]
+                                            '$cond': {
+                                                'if': {
+                                                    '$lt': [
+                                                        { '$ifNull': [ "$$horario.horaSalida", "$$horario.horaLlegada" ] }, '$hastaHoraLocal'
+                                                    ]
+                                                }, 
+                                                'then': {
+                                                    '$lt': [
+                                                        '$hastaHoraLocal', '$desdeHoraLocal'
+                                                    ]
+                                                }, 
+                                                'else': 0
+                                            }
                                         }
                                     }
                                 }, 
@@ -569,13 +579,7 @@ async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta
       }
     ]
 
-  # Si fecha y hasta son distintos dias
-  if (desde.day != hasta.day):
-    documentos = await db["paradas"].aggregate(aggregate_horarios(desde, desde.replace(hour=23, minute=59, second=59))).to_list(1000)
-    documentos += await db["paradas"].aggregate(aggregate_horarios(hasta.replace(hour=0, minute=0, second=0), hasta)).to_list(1000)
-  else:
-    print(aggregate_horarios(desde, hasta))
-    documentos = await db["paradas"].aggregate(aggregate_horarios(desde, hasta)).to_list(1000)
+  documentos = await db["paradas"].aggregate(aggregate_horarios(desde, hasta)).to_list(1000)    
   return documentos
 
 @app.get("/paradas/{id}/agencias", response_description="Obtener agencias de idParada", response_model=List[AgenciaModel], response_model_exclude_none=True)
