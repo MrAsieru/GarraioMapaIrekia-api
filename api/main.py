@@ -4,8 +4,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from typing import List
 import motor.motor_asyncio
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime, timezone, timedelta
-import pytz
+from datetime import datetime, timedelta
 import requests
 import asyncio
 
@@ -197,7 +196,7 @@ async def get_route_patterns(id: str):
   patrones = await db["lineas"].aggregate([
     {
       '$match': {
-        '_id': 'Bizkaibus_651'
+        '_id': id
       }
     },
     {
@@ -279,17 +278,16 @@ async def get_stop_lines_colors(id: str):
   return lineas
 
 @app.get("/paradas/{id}/horarios", response_description="Obtener horarios de idParada", response_model=List[ViajeParadaModel], response_model_exclude_none=True)
-async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta: datetime = None):
-  # Change desde to UTC
-  desde = desde.astimezone(pytz.utc)
+async def get_stop_schedules(id: str, desde: datetime = None, hasta: datetime = None):
+  # Establecer valores predeterminados
+  if desde is None:
+    desde = datetime.utcnow()
   if hasta is None:
     hasta = desde + timedelta(hours=2)
-  hasta = hasta.astimezone(pytz.utc)
+  
   print(f"Fecha: {desde}, hasta: {hasta}")
-  print(f"{desde.replace(hour=23, minute=59, second=59)}, {hasta.replace(hour=0, minute=0, second=0)}")
 
-  def aggregate_horarios(fDesde: datetime, fHasta: datetime):
-    return [
+  documentos = await db["paradas"].aggregate([
       {
         '$match': {
           '$or': [
@@ -346,19 +344,19 @@ async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta
             '$dateFromParts': {
               'year': {
                 '$year': {
-                  'date': fDesde, 
+                  'date': desde, 
                   'timezone': '$agencia.zonaHoraria'
                 }
               }, 
               'month': {
                 '$month': {
-                  'date': fDesde, 
+                  'date': desde, 
                   'timezone': '$agencia.zonaHoraria'
                 }
               }, 
               'day': {
                 '$dayOfMonth': {
-                  'date': fDesde, 
+                  'date': desde, 
                   'timezone': '$agencia.zonaHoraria'
                 }
               }
@@ -368,19 +366,19 @@ async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta
             '$dateFromParts': {
               'year': {
                 '$year': {
-                  'date': fHasta, 
+                  'date': hasta, 
                   'timezone': '$agencia.zonaHoraria'
                 }
               }, 
               'month': {
                 '$month': {
-                  'date': fHasta, 
+                  'date': hasta, 
                   'timezone': '$agencia.zonaHoraria'
                 }
               }, 
               'day': {
                 '$dayOfMonth': {
-                  'date': fHasta, 
+                  'date': hasta, 
                   'timezone': '$agencia.zonaHoraria'
                 }
               }
@@ -388,14 +386,14 @@ async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta
           },
           'desdeHoraLocal': {
             '$dateToString': {
-              'date': fDesde, 
+              'date': desde, 
               'format': '%H:%M:%S', 
               'timezone': '$agencia.zonaHoraria'
             }
           },
           'hastaHoraLocal': {
             '$dateToString': {
-              'date': fHasta, 
+              'date': hasta, 
               'format': '%H:%M:%S', 
               'timezone': '$agencia.zonaHoraria'
             }
@@ -412,19 +410,19 @@ async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta
                     '$dateFromParts': {
                       'year': {
                         '$year': {
-                          'date': fDesde, 
+                          'date': desde, 
                           'timezone': '$zonaHoraria'
                         }
                       }, 
                       'month': {
                         '$month': {
-                          'date': fDesde, 
+                          'date': desde, 
                           'timezone': '$zonaHoraria'
                         }
                       }, 
                       'day': {
                         '$dayOfMonth': {
-                          'date': fDesde, 
+                          'date': desde, 
                           'timezone': '$zonaHoraria'
                         }
                       }
@@ -437,19 +435,19 @@ async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta
                     '$dateFromParts': {
                       'year': {
                         '$year': {
-                          'date': fHasta, 
+                          'date': hasta, 
                           'timezone': '$zonaHoraria'
                         }
                       }, 
                       'month': {
                         '$month': {
-                          'date': fHasta, 
+                          'date': hasta, 
                           'timezone': '$zonaHoraria'
                         }
                       }, 
                       'day': {
                         '$dayOfMonth': {
-                          'date': fHasta, 
+                          'date': hasta, 
                           'timezone': '$zonaHoraria'
                         }
                       }
@@ -577,9 +575,7 @@ async def get_stop_schedules(id: str, desde: datetime = datetime.utcnow(), hasta
           'horarios': 0
         }
       }
-    ]
-
-  documentos = await db["paradas"].aggregate(aggregate_horarios(desde, hasta)).to_list(1000)    
+    ]).to_list(1000)    
   return documentos
 
 @app.get("/paradas/{id}/agencias", response_description="Obtener agencias de idParada", response_model=List[AgenciaModel], response_model_exclude_none=True)
