@@ -227,22 +227,30 @@ async def get_route_patterns(id: str):
   return patrones
 
 @app.get("/paradas", response_description="Obtener todas las paradas", response_model=List[ParadaModel], response_model_exclude_none=True)
-async def get_stops():
+async def get_stops(incluirLineas: bool = False, incluirViajes: bool = False, incluirAgencias: bool = False):
   proyeccion = {
-    "_id": 0,
-    "lineas": 0,
-    "viajes": 0
+    "_id": 0
   }
+  if not incluirLineas:
+    proyeccion["lineas"] = 0
+  if not incluirViajes:
+    proyeccion["viajes"] = 0
+  if not incluirAgencias:
+    proyeccion["agencias"] = 0
   paradas = await db["paradas"].find(projection=proyeccion).to_list(1000)
   return paradas
 
 @app.get("/paradas/{id}", response_description="Obtener parada por stop_id", response_model=ParadaModel, response_model_exclude_none=True)
-async def get_stop_id(id: str):
+async def get_stop_id(id: str, incluirLineas: bool = False, incluirViajes: bool = False, incluirAgencias: bool = False):
   proyeccion = {
-    "_id": 0,
-    "lineas": 0,
-    "viajes": 0
+    "_id": 0
   }
+  if not incluirLineas:
+    proyeccion["lineas"] = 0
+  if not incluirViajes:
+    proyeccion["viajes"] = 0
+  if not incluirAgencias:
+    proyeccion["agencias"] = 0
   parada = await db["paradas"].find_one({"_id": id}, projection=proyeccion)
   return parada
 
@@ -721,7 +729,6 @@ lista_feeds = {} # {idFeed: {suscripciones: [websocket], tiempoReal: [{url: str,
 
 
 async def descargar_tiempo_real(fuente_tr: dict) -> (dict, str):
-  print(f"Fetching real-time data from {fuente_tr['url']}")
   try:
     # Establecer cabeceras para evitar descargar datos si no han sido modificados
     headers = {}
@@ -731,23 +738,19 @@ async def descargar_tiempo_real(fuente_tr: dict) -> (dict, str):
     # Descargar datos
     response = requests.get(fuente_tr["url"], headers=headers)
     response.raise_for_status()
-    print("Data fetched successfully")
 
     if response.status_code == 304:
       # Si los datos no han sido modificados, devolver None
-      print("Datos no modificados")
       return None, None
     else:
       ultima_modificacion = response.headers["Last-Modified"] if "Last-Modified" in response.headers else datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
       return response.content, ultima_modificacion
   except requests.exceptions.RequestException as e:
-    print(f"Error fetching real-time data: {e}")
+    print(f"Error obteniendo datos: {e}")
     return None
 
 
 async def actualizar_tiempo_real(idFeed: str):
-  print(f"Updating feed {idFeed}")
-
   # Actualizar solamente feeds con suscriptores
   if len(lista_feeds[idFeed]["suscripciones"]) > 0:
     actualizar = False
@@ -768,7 +771,7 @@ async def actualizar_tiempo_real(idFeed: str):
 
 async def repeticion():
   while True:
-    print("Updating real-time data")
+    print("Comprobando cambios de tiempo real")
     for idFeed in lista_feeds.keys():
       await actualizar_tiempo_real(idFeed)
     await asyncio.sleep(15)
@@ -776,7 +779,7 @@ async def repeticion():
 
 async def enviar_datos(websocket: WebSocket, idFeed: str):
   global lista_feeds
-  print(f"Sending {idFeed} data to client {websocket}")
+  print(f"Enviando datos de {idFeed} al cliente {websocket}")
   # Formato de mensaje binario: [Longitud idFeed (2 Bytes)][idFeed (x Bytes)][Protobuf (y Bytes)]
   # Calcular y codificar longitud del idFeed
   idFeedLen = len(idFeed).to_bytes(2, byteorder="big")
@@ -793,7 +796,6 @@ async def enviar_datos(websocket: WebSocket, idFeed: str):
 
 async def agregar_suscripciones(feeds_cliente: list[str], websocket: WebSocket):
   global lista_feeds
-  print("Suscribiendo websocket")
   # Recibir ids de feeds que contengan datos en tiempoReal, donde tiempoReal si existe es una url
   feeds_nuevos = list(set(feeds_cliente) - set(lista_feeds.keys()))
 
@@ -830,7 +832,6 @@ async def agregar_suscripciones(feeds_cliente: list[str], websocket: WebSocket):
 
 
 async def eliminar_suscripciones(feeds_cliente: list[str], websocket: WebSocket):
-  print(f"Eliminando suscripciones {websocket}")
   for feed in feeds_cliente:
     if feed in lista_feeds.keys():
       l = len(lista_feeds[feed]["suscripciones"])
@@ -858,7 +859,7 @@ async def actualizar_suscripciones(feeds_actuales: list[str], feeds_nuevos: list
 @app.websocket("/tiempoReal")
 async def websocket_endpoint(websocket: WebSocket):
   await websocket.accept()
-  print("Websocket accepted")
+  print("Conexión websocket aceptada")
   feeds_cliente = []
   try:
     # Mantener websocket abierto
