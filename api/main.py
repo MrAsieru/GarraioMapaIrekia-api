@@ -13,6 +13,8 @@ from api.models.feed import FeedModel
 from api.models.posicion import PosicionesModel, PosicionesRequestModel
 from api.models.linea import LineaModel, RespuestaPatronLineaModel
 from api.models.parada import ViajeParadaModel, ParadaModel
+from api.models.viaje import ViajeModel
+
 
 
 app = FastAPI()
@@ -628,6 +630,57 @@ async def get_stop_agencies(id: str):
     }
   ]).to_list(1000)
   return documentos
+
+@app.get("/viajes/{id}", response_description="Obtener viaje por idViaje", response_model=ViajeModel, response_model_exclude_none=True)
+async def get_trip_id(id: str, incluirHorarios: bool = False, incluirParadas: bool = False, incluirFechas: bool = False, incluirFrecuencias: bool = False):
+  proyeccion = {
+    "_id": 0
+  }
+  if not incluirHorarios:
+    proyeccion["horarios"] = 0
+  if not incluirParadas:
+    proyeccion["paradas"] = 0
+  if not incluirFechas:
+    proyeccion["fechas"] = 0
+  if not incluirFrecuencias:
+    proyeccion["frecuencias"] = 0
+  
+  parada = await db["viajes"].find_one({"_id": id}, projection=proyeccion)
+  return parada
+
+@app.get("/viajes/{id}/paradas", response_description="Obtener paradas de idViaje", response_model=List[ParadaModel], response_model_exclude_none=True)
+async def get_trip_stops(id: str):
+  paradas = await db["viajes"].aggregate([
+    {
+      '$match': {
+        '_id': id
+      }
+    },
+    {
+      '$lookup': {
+        'from': 'paradas', 
+        'localField': 'paradas', 
+        'foreignField': '_id', 
+        'as': 'paradas'
+      }
+    },
+    {
+      '$unwind': '$paradas'
+    },
+    {
+      '$replaceRoot': {
+        'newRoot': '$paradas'
+      }
+    },
+    {
+      '$project': {
+        '_id': 0, 
+        'lineas': 0, 
+        'viajes': 0
+      }
+    }
+  ]).to_list(1000)
+  return paradas
 
 @app.post("/posicionesVehiculos", response_description="Obtener posiciones de los vehiculos para la fecha y agencias solicitadas", response_model=PosicionesModel, response_model_exclude_none=True)
 async def get_posicionesVehiculos(datos: PosicionesRequestModel):

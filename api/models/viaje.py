@@ -12,8 +12,8 @@ class HorarioViajeModel(BaseModel):
   letrero: str | None = None
   tipoRecogida: int | None = None
   tipoBajada: int | None = None
-  recogidaContinua: bool | None = None
-  bajadaContinua: bool | None = None
+  recogidaContinua: int | None = None
+  bajadaContinua: int | None = None
   distanciaRecorrida: float | None = None
   exacto: bool | None = None
 
@@ -39,3 +39,4 @@ class ViajeModel(BaseModel):
   paradas: list[str] | None = None
   frecuencias: list[FrecuenciasViajeModel] | None = None
   fechas: list[datetime.datetime] | None = None
+  bbox: list[float]
