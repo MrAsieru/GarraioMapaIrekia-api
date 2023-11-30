@@ -1,3 +1,4 @@
+from fastapi.websockets import WebSocketState
 from api.db import db
 from api.routers import agencias, feeds, lineas, paradas, posiciones, viajes
 
@@ -7,6 +8,7 @@ from datetime import datetime
 
 import requests
 import asyncio
+import aiohttp
 
 
 app = FastAPI()
@@ -40,7 +42,8 @@ app.add_middleware(
 
 # Websocket
 websocket_clients = []
-lista_feeds = {} # {idFeed: {suscripciones: [websocket], tiempoReal: [{url: str, data: bytes|None, modificado: str|None}]}}
+lista_feeds = {} # {idFeed: {suscripciones: [websocket], tiempoReal: [{url: str, data: bytes|None, modificado: str|None, etag: str|None}]}}
+
 
 
 async def descargar_tiempo_real(fuente_tr: dict) -> (dict, str):
@@ -49,20 +52,23 @@ async def descargar_tiempo_real(fuente_tr: dict) -> (dict, str):
     headers = {}
     if fuente_tr["modificado"] is not None:
       headers["If-Modified-Since"] = fuente_tr["modificado"]
+    if fuente_tr["etag"] is not None:
+      headers["If-None-Match"] = fuente_tr["etag"]
     
     # Descargar datos
-    response = requests.get(fuente_tr["url"], headers=headers)
-    response.raise_for_status()
-
-    if response.status_code == 304:
-      # Si los datos no han sido modificados, devolver None
-      return None, None
-    else:
-      ultima_modificacion = response.headers["Last-Modified"] if "Last-Modified" in response.headers else datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
-      return response.content, ultima_modificacion
-  except requests.exceptions.RequestException as e:
+    async with aiohttp.ClientSession() as session:
+      async with session.get(fuente_tr["url"], headers=headers) as response:
+        if response.status == 304:
+          # Si los datos no han sido modificados, devolver None
+          return None, None, None
+        else:
+          ultima_modificacion = response.headers.get("Last-Modified", datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT"))
+          etag = response.headers.get("ETag", None)
+          content = await response.read()
+          return content, ultima_modificacion, etag
+  except aiohttp.ClientError as e:
     print(f"Error obteniendo datos: {e}")
-    return None
+    return None, None, None
 
 
 async def actualizar_tiempo_real(idFeed: str):
@@ -71,23 +77,24 @@ async def actualizar_tiempo_real(idFeed: str):
     actualizar = False
     # Recorrer todas las fuentes de tiempo real del feed
     for fuente_tr in lista_feeds[idFeed]["tiempoReal"]:
-      new_data, modificado = await descargar_tiempo_real(fuente_tr)
+      new_data, modificado, etag = await descargar_tiempo_real(fuente_tr)
 
       # Si se obtuvieron datos nuevos, actualizarlos
       if new_data is not None:
         fuente_tr["data"] = new_data
         fuente_tr["modificado"] = modificado
+        fuente_tr["etag"] = etag
         actualizar = True
 
     if actualizar:
-      for client in lista_feeds[idFeed]["suscripciones"]:
+      for client in list(lista_feeds[idFeed]["suscripciones"]):
         await enviar_datos(client, idFeed)
 
 
 async def repeticion():
   while True:
     print("Comprobando cambios de tiempo real")
-    for idFeed in lista_feeds.keys():
+    for idFeed in list(lista_feeds.keys()):
       await actualizar_tiempo_real(idFeed)
     await asyncio.sleep(15)
 
@@ -101,12 +108,13 @@ async def enviar_datos(websocket: WebSocket, idFeed: str):
 
   # Agrupar datos existentes
   datos = b""
-  for fuente_tr in lista_feeds[idFeed]["tiempoReal"]:
+  for fuente_tr in list(lista_feeds[idFeed]["tiempoReal"]):
     if fuente_tr["data"] is not None:
       datos += fuente_tr["data"]
 
   # Crear mensaje y enviarlo
-  await websocket.send_bytes(idFeedLen + idFeed.encode(encoding="utf-8") + datos)
+  if websocket.client_state == WebSocketState.CONNECTED:
+    await websocket.send_bytes(idFeedLen + idFeed.encode(encoding="utf-8") + datos)
 
 
 async def agregar_suscripciones(feeds_cliente: list[str], websocket: WebSocket):
@@ -133,7 +141,7 @@ async def agregar_suscripciones(feeds_cliente: list[str], websocket: WebSocket):
       # Obtener url de feed desde feeds_validos siendo feed igual a _id
 
       for url in feeds_validos_dict[feed]["tiempoReal"]:
-        lista_feeds[feed]["tiempoReal"].append({"url": url, "data": None, "modificado": None})
+        lista_feeds[feed]["tiempoReal"].append({"url": url, "data": None, "modificado": None, "etag": None})
     
     # Añadir websocket a la lista de suscripciones del feed
     lista_feeds[feed]["suscripciones"].append(websocket)
@@ -143,7 +151,7 @@ async def agregar_suscripciones(feeds_cliente: list[str], websocket: WebSocket):
       await actualizar_tiempo_real(feed)
     else:
       await enviar_datos(websocket, feed)
-  print([f"{f} - {len(lista_feeds[f]['suscripciones'])} suscriptores\n" for f in lista_feeds.keys()])
+  print([f"{f} - {len(lista_feeds[f]['suscripciones'])} suscriptores\n" for f in list(lista_feeds.keys())])
 
 
 async def eliminar_suscripciones(feeds_cliente: list[str], websocket: WebSocket):
@@ -154,8 +162,6 @@ async def eliminar_suscripciones(feeds_cliente: list[str], websocket: WebSocket)
         lista_feeds[feed]["suscripciones"].remove(websocket)
       except ValueError:
         pass
-      if len(lista_feeds[feed]["suscripciones"]) == 0:
-        del lista_feeds[feed]
   print([f"{f} - {len(lista_feeds[f]['suscripciones'])} suscriptores\n" for f in lista_feeds.keys()])
 
 
