@@ -57,8 +57,17 @@ async def get_parada(id: str, response: Response, incluirLineas: bool = False, i
 
 
 @router.get("/{id}/lineas", response_description="Obtener lineas de idParada", response_model=List[LineaModel], response_model_exclude_none=True)
-async def get_parada_lineas(id: str, response: Response):
+async def get_parada_lineas(id: str, response: Response, incluirViajes: bool = False, incluirPatrones: bool = False, incluirParadas: bool = False):
   try:
+    proyeccion = {
+      "_id": 0
+    }
+    if not incluirViajes:
+      proyeccion["viajes"] = 0
+    if not incluirPatrones:
+      proyeccion["patrones"] = 0
+    if not incluirParadas:
+      proyeccion["paradas"] = 0
     lineas = await db.aggregate("paradas", [
       {
         '$match': {
@@ -87,10 +96,7 @@ async def get_parada_lineas(id: str, response: Response):
         }
       },
       {
-        '$project': {
-          'viajes': 0, 
-          'paradas': 0
-        }
+        '$project': proyeccion
       }
     ])
   except:

@@ -2,6 +2,13 @@ from pydantic import BaseModel
 from datetime import datetime
 
 
+class FeedFuenteModel(BaseModel):
+  tipo: str
+  atribucion: str
+  urlAtribucion: str
+  url: str | None = None
+  conjuntoDatoId: str | None = None
+
 class FeedInfoModel(BaseModel):
   nombreEditor: str
   urlEditor: str
@@ -30,6 +37,7 @@ class FeedAtribucionModel(BaseModel):
 
 class FeedModel(BaseModel):
   idFeed: str
+  fuentes: list[str] | None = None
   info: FeedInfoModel | None = None
   atribuciones: FeedAtribucionModel | None = None
   tiempoReal: list[str] | None = None

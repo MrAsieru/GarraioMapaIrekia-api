@@ -47,19 +47,18 @@ async def get_lineas(response: Response):
 
 
 @router.get("/{id}", response_description="Obtener ruta por idLinea", response_model=LineaModel, response_model_exclude_none=True)
-async def get_linea(id: str, response: Response):
+async def get_linea(id: str, response: Response, incluirViajes: bool = False, incluirPatrones: bool = False, incluirParadas: bool = False):
   try:
-    ruta = await db.find_one("lineas",
-      {
-        "_id": id
-      },
-      {
-        "_id": 0,
-        "viajes": 0,
-        "paradas": 0,
-        "patrones": 0
-      }
-    )
+    proyeccion = {
+      "_id": 0
+    }
+    if not incluirViajes:
+      proyeccion["viajes"] = 0
+    if not incluirPatrones:
+      proyeccion["patrones"] = 0
+    if not incluirParadas:
+      proyeccion["paradas"] = 0
+    ruta = await db.find_one("lineas", {"_id": id}, proyeccion)
   except:
     response.status_code = 500
     return []
