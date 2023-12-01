@@ -64,7 +64,7 @@ async def get_linea(id: str, response: Response):
     response.status_code = 500
     return []
   else:
-    if len(ruta) == 0:
+    if not ruta:
       response.status_code = 204
     return ruta
 

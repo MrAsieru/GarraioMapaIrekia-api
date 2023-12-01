@@ -51,7 +51,7 @@ async def get_parada(id: str, response: Response, incluirLineas: bool = False, i
     response.status_code = 500
     return []
   else:
-    if len(parada) == 0:
+    if not parada:
       response.status_code = 204
     return parada
 

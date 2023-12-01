@@ -74,7 +74,7 @@ async def get_agencia(id: str, response: Response):
     response.status_code = 500
     return []
   else:
-    if len(agencia) == 0:
+    if not agencia:
       response.status_code = 204
     return agencia
   
