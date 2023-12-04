@@ -1,13 +1,15 @@
 from pydantic import BaseModel
 from datetime import datetime
 
+from api.models.agencia import AgenciaModel
+
 
 class FeedFuenteModel(BaseModel):
   tipo: str
   atribucion: str
   urlAtribucion: str
   url: str | None = None
-  conjuntoDatoId: str | None = None
+  conjuntoDatoId: int | None = None
 
 class FeedInfoModel(BaseModel):
   nombreEditor: str
@@ -35,9 +37,20 @@ class FeedAtribucionModel(BaseModel):
   telefono: str | None = None
 
 
+class FeedAtribucionNombreModel(BaseModel):
+  id: str
+  nombre: str | None = None
+  nombreCorto: str | None = None
+  nombreLargo: str | None = None
+
+
 class FeedModel(BaseModel):
   idFeed: str
-  fuentes: list[str] | None = None
+  nombre: str
+  fuentes: list[FeedFuenteModel] | None = None
   info: FeedInfoModel | None = None
-  atribuciones: FeedAtribucionModel | None = None
+  atribuciones: list[FeedAtribucionModel] | None = None
   tiempoReal: list[str] | None = None
+  agencias: list[FeedAtribucionNombreModel] | None = None
+  lineas: list[FeedAtribucionNombreModel] | None = None
+  viajes: list[FeedAtribucionNombreModel] | None = None
