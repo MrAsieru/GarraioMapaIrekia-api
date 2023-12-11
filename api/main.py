@@ -8,15 +8,15 @@ from api.routers import agencias, feeds, lineas, paradas, posiciones, tiemporeal
 app = FastAPI()
 
 # Routers HTTP
-app.include_router(feeds.router, prefix="/api")
-app.include_router(agencias.router, prefix="/api")
-app.include_router(lineas.router, prefix="/api")
-app.include_router(paradas.router, prefix="/api")
-app.include_router(viajes.router, prefix="/api")
-app.include_router(posiciones.router, prefix="/api")
+app.include_router(feeds.router)
+app.include_router(agencias.router)
+app.include_router(lineas.router)
+app.include_router(paradas.router)
+app.include_router(viajes.router)
+app.include_router(posiciones.router)
 
 # Routers WebSocket
-app.include_router(tiemporeal.router, prefix="/ws")
+app.include_router(tiemporeal.router)
 
 
 @app.on_event("startup")
@@ -31,7 +31,7 @@ async def shutdown():
 #TODO: Quitar localhost
 app.add_middleware(
   CORSMiddleware,
-  allow_origins=['http://gtfs.mrasieru.live', 'https://gtfs.mrasieru.live', 'http://localhost:8100'],
+  allow_origins=['https://www.mrasieru.live', 'http://localhost:8100'],
   allow_credentials=False,
   allow_methods=['GET', 'POST'],
   allow_headers=['*'],
