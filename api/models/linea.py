@@ -7,9 +7,9 @@ from api.models.agencia import AgenciaModel
 class PatronLineaModel(BaseModel):
   de: str
   a: str
-  idDireccion: str | None = None
+  direccion: str | None = None
   letrero: str | None = None
-  viajes: list[str] | None = None
+  numViajes: int
   paradas: list[str]
 
 class LineaModel(BaseModel):
@@ -31,7 +31,3 @@ class LineaModel(BaseModel):
   viajes: list[str] | None = None
   bbox: list[float]
   patrones: list[PatronLineaModel] | None = None
-
-
-class RespuestaPatronLineaModel(PatronLineaModel):
-  numViajes: int

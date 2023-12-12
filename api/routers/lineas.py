@@ -3,7 +3,7 @@ from api.db import db
 
 from typing import List
 
-from api.models.linea import LineaModel, RespuestaPatronLineaModel
+from api.models.linea import LineaModel, PatronLineaModel
 from api.models.parada import ParadaModel
 
 
@@ -110,7 +110,7 @@ async def get_linea_paradas(id: str, response: Response):
     return paradas
 
 
-@router.get("/{id}/patrones", response_description="Obtener patrones de idLinea", response_model=List[RespuestaPatronLineaModel], response_model_exclude_none=True)
+@router.get("/{id}/patrones", response_description="Obtener patrones de idLinea", response_model=List[PatronLineaModel], response_model_exclude_none=True)
 async def get_linea_patrones(id: str, response: Response):
   try:
     patrones = await db.aggregate("lineas", [
@@ -127,18 +127,6 @@ async def get_linea_patrones(id: str, response: Response):
       {
         '$replaceRoot': {
           'newRoot': '$patrones'
-        }
-      },
-      {
-        '$addFields': {
-          'numViajes': {
-            '$size': '$viajes'
-          }
-        }
-      },
-      {
-        '$project': {
-          'viajes': 0
         }
       }
     ])
