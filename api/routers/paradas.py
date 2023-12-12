@@ -108,7 +108,7 @@ async def get_parada_lineas(id: str, response: Response, incluirViajes: bool = F
     return lineas
 
 
-@router.get("/{id}/horarios", response_description="Obtener horarios de idParada", response_model=List[ViajeParadaModel], response_model_exclude_none=True)
+@router.get("/{id}/horarios", response_description="Obtener horarios de idParada (Max. 23h59m diferencia)", response_model=List[ViajeParadaModel], response_model_exclude_none=True)
 async def get_parada_horarios(id: str, response: Response, desde: datetime = None, hasta: datetime = None):
   try:
     # Establecer valores predeterminados
@@ -116,6 +116,11 @@ async def get_parada_horarios(id: str, response: Response, desde: datetime = Non
       desde = datetime.utcnow()
     if hasta is None:
       hasta = desde + timedelta(hours=2)
+
+    # Diferencia < 24h
+    if (hasta - desde) > timedelta(hours=24):
+      response.status_code = 400
+      return []
     
     print(f"Fecha: {desde}, hasta: {hasta}")
 
