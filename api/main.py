@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.db import db
 from api.routers import agencias, feeds, lineas, paradas, posiciones, tiemporeal, viajes
 
-
+ORIGEN_WEB = 'http://localhost'
 app = FastAPI()
 
 # Routers HTTP
@@ -31,7 +31,7 @@ async def shutdown():
 #TODO: Quitar localhost
 app.add_middleware(
   CORSMiddleware,
-  allow_origins=['https://www.mrasieru.live', 'http://localhost:8100'],
+  allow_origins=[ORIGEN_WEB],
   allow_credentials=False,
   allow_methods=['GET', 'POST'],
   allow_headers=['*'],
