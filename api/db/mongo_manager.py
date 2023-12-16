@@ -11,8 +11,8 @@ class MongoManager:
     db: AsyncIOMotorDatabase = None
 
     async def connect_to_database(self):
-        self.client = motor.motor_asyncio.AsyncIOMotorClient(f"mongodb://{os.environ['MONGODB_API_USER']}:{os.environ['MONGODB_API_USER_PASSWORD']}@mongodb:27017/{os.environ['MONGODB_INITDB_DATABASE']}", tz_aware=True)
-        self.db = self.client[os.environ['MONGODB_INITDB_DATABASE']]
+        self.client = motor.motor_asyncio.AsyncIOMotorClient(f"mongodb://{os.environ['MONGODB_API_USER']}:{os.environ['MONGODB_API_USER_PASSWORD']}@mongodb:27017/gtfs", tz_aware=True)
+        self.db = self.client["gtfs"]
 
     async def close_database_connection(self):
         self.client.close()
