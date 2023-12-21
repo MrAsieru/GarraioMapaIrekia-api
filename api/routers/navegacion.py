@@ -9,8 +9,7 @@ from api.models.navegacion import AutocompletadoModel, NavegacionRequestModel
 
 router = APIRouter(prefix="/navegacion")
 
-GRAPHQL_ENDPOINT = "http://localhost:8080/otp/routers/default/index/graphql"
-AUTOCOMPLETADO_ENDPOINT = "http://localhost:8080/otp/routers/default/geocode"
+GRAPHQL_ENDPOINT = "http://opentripplanner:8080/otp/routers/default/index/graphql"
 
 
 @router.post("/", response_description="Obtener plan de navegacion", response_model=object, response_model_exclude_none=True)
@@ -142,13 +141,4 @@ async def get_plan_navegacion(peticion: NavegacionRequestModel, response: Respon
         return await respuesta.json()
   except:
     response.status_code = 500
-    return []
-  
-@router.get("/autocompletar", response_description="Obtener sugerencias de autocompletado", response_model=List[AutocompletadoModel])
-async def get_sugerencias_autocompletado(texto: str):
-  try:
-    async with aiohttp.ClientSession() as session:
-      async with session.get(AUTOCOMPLETADO_ENDPOINT, params={"query": texto, "autocomplete": 1}) as respuesta:
-        return await respuesta.json()
-  except:
     return []
