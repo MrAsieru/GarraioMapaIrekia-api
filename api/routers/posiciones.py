@@ -9,7 +9,7 @@ from api.models.posicion import PosicionesModel, PosicionesRequestModel
 router = APIRouter(prefix="/posiciones")
 
 
-@router.post("/", response_description="Obtener posiciones de los vehiculos para la fecha y agencias solicitadas", response_model=PosicionesModel, response_model_exclude_none=True)
+@router.post("/", response_description="Obtener posiciones de los vehiculos para la fecha y agencias solicitadas", response_model=PosicionesModel | None, response_model_exclude_none=True)
 async def get_posiciones(datos: PosicionesRequestModel, response: Response):
   try:
     documentos = await db.aggregate("posiciones", [
@@ -48,4 +48,5 @@ async def get_posiciones(datos: PosicionesRequestModel, response: Response):
   else:
     if len(documentos) == 0:
       response.status_code = 204
-    return documentos[0]
+    else:
+      return documentos[0]

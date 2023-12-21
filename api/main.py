@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.db import db
-from api.routers import agencias, feeds, lineas, paradas, posiciones, tiemporeal, viajes
+from api.routers import agencias, feeds, lineas, paradas, posiciones, tiemporeal, viajes, navegacion
 
 ORIGEN_WEB = 'http://localhost'
 app = FastAPI()
@@ -14,6 +14,7 @@ app.include_router(lineas.router)
 app.include_router(paradas.router)
 app.include_router(viajes.router)
 app.include_router(posiciones.router)
+app.include_router(navegacion.router)
 
 # Routers WebSocket
 app.include_router(tiemporeal.router)
