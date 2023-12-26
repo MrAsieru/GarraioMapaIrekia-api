@@ -29,6 +29,7 @@ async def get_plan_navegacion(peticion: NavegacionRequestModel, response: Respon
           locale: $locale
         ) {
           date
+          nextPageCursor
           from {
             name
             lat
